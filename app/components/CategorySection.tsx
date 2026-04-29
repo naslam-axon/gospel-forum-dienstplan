@@ -12,9 +12,10 @@ type Props = {
   groupName: string;
   services: CTEventService[];
   serviceMap: Map<number, ServiceMeta>;
+  eventId: number;
 };
 
-export function CategorySection({ groupName, services, serviceMap }: Props) {
+export function CategorySection({ groupName, services, serviceMap, eventId }: Props) {
   const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState<CTEventService | null>(null);
 
@@ -54,11 +55,14 @@ export function CategorySection({ groupName, services, serviceMap }: Props) {
         </div>
       )}
 
+      {/* key=selected.id resets drawer state when a different slot is chosen */}
       <PersonDrawer
+        key={selected?.id ?? "none"}
         service={selected}
         positionName={
           selected ? (serviceMap.get(selected.serviceId)?.name ?? "Position") : ""
         }
+        eventId={eventId}
         onClose={() => setSelected(null)}
       />
     </section>
