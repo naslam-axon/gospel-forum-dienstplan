@@ -18,7 +18,7 @@ export function CategorySection({ groupName, services, serviceMap }: Props) {
   const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState<CTEventService | null>(null);
 
-  const filled = services.filter((s) => s.isAccepted === true).length;
+  const filled = services.filter((s) => s.person !== null).length;
   const total = services.length;
 
   return (

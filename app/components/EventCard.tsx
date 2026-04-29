@@ -17,7 +17,7 @@ type Props = { event: CTEvent };
 
 export function EventCard({ event }: Props) {
   const services = event.eventServices ?? [];
-  const filled = services.filter((s) => s.isAccepted === true).length;
+  const filled = services.filter((s) => s.person !== null).length;
   const total = services.length;
 
   return (

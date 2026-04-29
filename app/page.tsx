@@ -7,15 +7,18 @@ function getWeekBounds(offset = 0) {
   const day = now.getDay();
   const monday = new Date(now);
   monday.setDate(now.getDate() - ((day + 6) % 7) + offset * 7);
-  monday.setHours(0, 0, 0, 0);
+  monday.setHours(12, 0, 0, 0); // noon avoids UTC±2 edge cases in toLocaleDateString
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 0);
-  return { monday, sunday };
+  // apiTo is Monday+7: CT API treats "to" as exclusive, so this covers Sunday fully
+  const apiTo = new Date(monday);
+  apiTo.setDate(monday.getDate() + 7);
+  return { monday, sunday, apiTo };
 }
 
+// Returns YYYY-MM-DD in Europe/Berlin timezone (safe across UTC offsets)
 function toISO(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
 }
 
 function formatWeekLabel(monday: Date, sunday: Date) {
@@ -33,8 +36,8 @@ type SearchParams = Promise<{ w?: string }>;
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const { w } = await searchParams;
   const offset = parseInt(w ?? "0", 10) || 0;
-  const { monday, sunday } = getWeekBounds(offset);
-  const events = await getEvents(toISO(monday), toISO(sunday));
+  const { monday, sunday, apiTo } = getWeekBounds(offset);
+  const events = await getEvents(toISO(monday), toISO(apiTo));
 
   const weekLabel = formatWeekLabel(monday, sunday);
 

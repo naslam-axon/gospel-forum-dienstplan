@@ -9,22 +9,22 @@ type Props = {
   onClick: () => void;
 };
 
-function StatusBadge({ status }: { status: boolean | null }) {
-  if (status === true)
+function StatusBadge({ service }: { service: CTEventService }) {
+  if (!service.person)
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-[#C8102E]">
+        <span>○</span> Vakant
+      </span>
+    );
+  if (service.isAccepted === true)
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium text-[#2E7D5B]">
         <span>✓</span> Bestätigt
       </span>
     );
-  if (status === false)
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-[#B8770A]">
-        <span>⏳</span> Ausstehend
-      </span>
-    );
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#C8102E]">
-      <span>○</span> Vakant
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#B8770A]">
+      <span>⏳</span> Ausstehend
     </span>
   );
 }
@@ -64,7 +64,7 @@ export function SlotRow({ service, positionName, onClick }: Props) {
         </div>
         <div className="text-xs text-gray-400 truncate">{positionName}</div>
       </div>
-      <StatusBadge status={service.isAccepted} />
+      <StatusBadge service={service} />
     </button>
   );
 }

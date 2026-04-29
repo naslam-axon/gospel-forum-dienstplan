@@ -33,7 +33,7 @@ export default async function EventDetailPage({ params }: { params: Params }) {
   const groupMap = new Map(serviceGroups.map((g) => [g.id, g]));
 
   const eventServices = event.eventServices ?? [];
-  const filledTotal = eventServices.filter((s) => s.isAccepted === true).length;
+  const filledTotal = eventServices.filter((s) => s.person !== null).length;
   const total = eventServices.length;
 
   // Group by serviceGroupId
