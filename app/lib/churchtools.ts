@@ -169,6 +169,13 @@ export async function assignPerson(
   });
 }
 
+export async function updateEventServices(
+  eventId: string,
+  services: Array<{ serviceId: number; count: number }>
+): Promise<void> {
+  await ctMutate("PUT", `/events/${eventId}/eventservices`, { services });
+}
+
 export async function removeAssignment(
   eventId: string,
   eventServiceId: string

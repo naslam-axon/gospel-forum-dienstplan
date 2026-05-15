@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getEvent, getServices, getServiceGroups } from "@/app/lib/churchtools";
 import { CoverageBar } from "@/app/components/CoverageBar";
 import { CategorySection } from "@/app/components/CategorySection";
+import { EditServicesModal } from "@/app/components/EditServicesModal";
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("de-DE", {
@@ -81,7 +82,15 @@ export default async function EventDetailPage({ params }: { params: Params }) {
 
         {total > 0 && (
           <div className="mt-4">
-            <div className="text-xs text-gray-500 mb-1">{filledTotal} von {total} Positionen besetzt</div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs text-gray-500">{filledTotal} von {total} Positionen besetzt</div>
+              <EditServicesModal
+                eventId={event.id}
+                allServices={services}
+                serviceGroups={serviceGroups}
+                currentServices={eventServices}
+              />
+            </div>
             <CoverageBar filled={filledTotal} total={total} />
           </div>
         )}
