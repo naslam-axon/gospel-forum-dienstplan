@@ -6,7 +6,7 @@ import { SlotRow } from "./SlotRow";
 import { PersonDrawer } from "./PersonDrawer";
 import { CoverageBar } from "./CoverageBar";
 
-type ServiceMeta = { id: number; name: string };
+type ServiceMeta = { id: number; name: string; sortKey: number };
 
 type Props = {
   groupName: string;
@@ -44,14 +44,26 @@ export function CategorySection({ groupName, services, serviceMap, eventId }: Pr
 
       {open && (
         <div className="divide-y divide-[#E8E6DE] border-t border-[#E8E6DE]">
-          {services.map((svc) => (
-            <SlotRow
-              key={svc.id}
-              service={svc}
-              positionName={serviceMap.get(svc.serviceId)?.name ?? `Service ${svc.serviceId}`}
-              onClick={() => setSelected(svc)}
-            />
-          ))}
+          {(() => {
+            const countById = new Map<number, number>();
+            for (const s of services) countById.set(s.serviceId, (countById.get(s.serviceId) ?? 0) + 1);
+            const indexById = new Map<number, number>();
+            return services.map((svc) => {
+              const base = serviceMap.get(svc.serviceId)?.name ?? `Service ${svc.serviceId}`;
+              const count = countById.get(svc.serviceId) ?? 1;
+              const idx = (indexById.get(svc.serviceId) ?? 0) + 1;
+              indexById.set(svc.serviceId, idx);
+              const positionName = count > 1 ? `${base} ${idx}` : base;
+              return (
+                <SlotRow
+                  key={svc.id}
+                  service={svc}
+                  positionName={positionName}
+                  onClick={() => setSelected(svc)}
+                />
+              );
+            });
+          })()}
         </div>
       )}
 

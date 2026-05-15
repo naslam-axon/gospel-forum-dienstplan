@@ -73,6 +73,7 @@ export type CTService = {
   id: number;
   name: string;
   serviceGroupId: number;
+  sortKey: number;
 };
 
 export type CTServiceGroup = {

@@ -45,12 +45,21 @@ export default async function EventDetailPage({ params }: { params: Params }) {
     grouped.get(groupId)!.push(svc);
   }
 
-  // Sort groups by sortKey
-  const sortedGroups = [...grouped.entries()].sort(([aId], [bId]) => {
-    const aKey = groupMap.get(aId)?.sortKey ?? 999;
-    const bKey = groupMap.get(bId)?.sortKey ?? 999;
-    return aKey - bKey;
-  });
+  // Sort groups by sortKey, then sort slots within each group by service sortKey
+  const sortedGroups = [...grouped.entries()]
+    .sort(([aId], [bId]) => {
+      const aKey = groupMap.get(aId)?.sortKey ?? 999;
+      const bKey = groupMap.get(bId)?.sortKey ?? 999;
+      return aKey - bKey;
+    })
+    .map(([groupId, slots]) => [
+      groupId,
+      [...slots].sort(
+        (a, b) =>
+          (serviceMap.get(a.serviceId)?.sortKey ?? 999) -
+          (serviceMap.get(b.serviceId)?.sortKey ?? 999)
+      ),
+    ] as const);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
