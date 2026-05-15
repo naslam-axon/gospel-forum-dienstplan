@@ -82,6 +82,13 @@ export type CTServiceGroup = {
   sortKey: number;
 };
 
+export type CTPersonSearchResult = {
+  id: number;
+  title: string;
+  imageUrl: string | null;
+  initials: string;
+};
+
 export type CTPossiblePerson = {
   person: {
     domainIdentifier: string;
@@ -132,6 +139,19 @@ export async function getPossiblePersons(
     `/events/${eventId}/services/${serviceId}/possiblepersons`
   );
   return Array.isArray(data) ? data : [];
+}
+
+export async function searchPersons(query: string): Promise<CTPersonSearchResult[]> {
+  const raw = await ctFetch<Array<{ id: number; firstName: string; lastName: string; imageUrl: string | null }>>(
+    "/persons",
+    { query, limit: "20" }
+  );
+  return (Array.isArray(raw) ? raw : []).map((p) => ({
+    id: p.id,
+    title: [p.firstName, p.lastName].filter(Boolean).join(" "),
+    imageUrl: p.imageUrl,
+    initials: `${p.firstName?.[0] ?? ""}${p.lastName?.[0] ?? ""}`.toUpperCase(),
+  }));
 }
 
 // ─── Write ────────────────────────────────────────────────────────────────────

@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import type { CTEventService, CTPossiblePerson } from "@/app/lib/churchtools";
+import type { CTEventService, CTPossiblePerson, CTPersonSearchResult } from "@/app/lib/churchtools";
 import { PersonPickList } from "./PersonPickList";
+
+type Candidate = {
+  id: number;
+  title: string;
+  imageUrl: string | null;
+  initials: string | null;
+};
 
 type Props = {
   service: CTEventService | null;
@@ -16,7 +23,8 @@ type Props = {
 type Mode =
   | { type: "info" }
   | { type: "picking" }
-  | { type: "confirming"; candidate: CTPossiblePerson }
+  | { type: "searching" }
+  | { type: "confirming"; candidate: Candidate }
   | { type: "loading"; message: string }
   | { type: "success"; message: string }
   | { type: "error"; message: string };
@@ -33,6 +41,105 @@ function formatDate(iso: string | null) {
   });
 }
 
+function fromPossiblePerson(p: CTPossiblePerson): Candidate {
+  return {
+    id: Number(p.person.domainIdentifier),
+    title: p.person.title,
+    imageUrl: p.person.imageUrl,
+    initials: p.person.initials,
+  };
+}
+
+function fromSearchResult(p: CTPersonSearchResult): Candidate {
+  return { id: p.id, title: p.title, imageUrl: p.imageUrl, initials: p.initials };
+}
+
+// ── Person search sub-component ────────────────────────────────────────────────
+function PersonSearch({
+  onSelect,
+  onBack,
+}: {
+  onSelect: (c: Candidate) => void;
+  onBack: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<CTPersonSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setResults([]);
+      return;
+    }
+    setLoading(true);
+    const timer = setTimeout(() => {
+      fetch(`/api/persons?q=${encodeURIComponent(query)}`)
+        .then((r) => r.json())
+        .then((data) => { if (Array.isArray(data)) setResults(data); })
+        .catch(() => setResults([]))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 py-3 border-b border-[#E8E6DE]">
+        <button onClick={onBack} className="text-xs text-gray-400 hover:text-[#C8102E] mb-2 block">
+          ← Zurück zur Liste
+        </button>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Name eingeben…"
+          autoFocus
+          className="w-full px-3 py-2 text-sm border border-[#E8E6DE] rounded-lg bg-[#F5F5F0] focus:outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto divide-y divide-[#E8E6DE]">
+        {loading && (
+          <div className="flex justify-center py-8">
+            <div className="w-5 h-5 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {!loading && query.length >= 2 && results.length === 0 && (
+          <p className="text-center text-sm text-gray-400 py-8">Keine Personen gefunden</p>
+        )}
+        {!loading && query.length < 2 && (
+          <p className="text-center text-sm text-gray-400 py-8">Mindestens 2 Zeichen eingeben</p>
+        )}
+        {results.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => onSelect(fromSearchResult(p))}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F5F5F0] transition-colors text-left"
+          >
+            <div className="shrink-0">
+              {p.imageUrl ? (
+                <Image
+                  src={p.imageUrl}
+                  alt={p.title}
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-[#E8E6DE] flex items-center justify-center text-sm font-semibold text-gray-600">
+                  {p.initials || "?"}
+                </div>
+              )}
+            </div>
+            <div className="text-sm font-medium truncate">{p.title}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 export function PersonDrawer({ service, positionName, eventId, onClose }: Props) {
   const router = useRouter();
 
@@ -41,7 +148,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
 
   const [mode, setMode] = useState<Mode>(initialMode);
 
-  // Reset mode when the selected service changes
   const handleClose = useCallback(() => {
     setMode(initialMode);
     onClose();
@@ -50,7 +156,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
 
   if (!service) return null;
 
-  // Capture into locals so closures don't need to narrow the nullable prop
   const eventServiceId = service.id;
   const serviceTypeId = service.serviceId;
   const person = service.person;
@@ -60,7 +165,7 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
   const comment = service.comment;
 
   // ── Assign ─────────────────────────────────────────────────────────────────
-  async function handleAssign(candidate: CTPossiblePerson) {
+  async function handleAssign(candidate: Candidate) {
     setMode({ type: "loading", message: "Anfrage wird gesendet…" });
     try {
       const res = await fetch("/api/servicerequest", {
@@ -69,13 +174,13 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
         body: JSON.stringify({
           eventId,
           eventServiceId,
-          personId: Number(candidate.person.domainIdentifier),
-          personName: candidate.person.title,
+          personId: candidate.id,
+          personName: candidate.title,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Fehler ${res.status}`);
-      setMode({ type: "success", message: `Anfrage an ${candidate.person.title} gesendet` });
+      setMode({ type: "success", message: `Anfrage an ${candidate.title} gesendet` });
       setTimeout(() => {
         router.refresh();
         handleClose();
@@ -108,7 +213,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
 
   // ── Drawer content ─────────────────────────────────────────────────────────
   function renderContent() {
-    // Loading
     if (mode.type === "loading") {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -118,7 +222,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
       );
     }
 
-    // Success
     if (mode.type === "success") {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-3">
@@ -130,7 +233,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
       );
     }
 
-    // Error
     if (mode.type === "error") {
       return (
         <div className="p-5 space-y-4">
@@ -147,33 +249,32 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
       );
     }
 
-    // Confirming
     if (mode.type === "confirming") {
       const { candidate } = mode;
       return (
         <div className="p-5 space-y-5">
           <div className="flex items-center gap-3 p-3 bg-[#F5F5F0] rounded-lg border border-[#E8E6DE]">
-            {candidate.person.imageUrl ? (
+            {candidate.imageUrl ? (
               <Image
-                src={candidate.person.imageUrl}
-                alt={candidate.person.title}
+                src={candidate.imageUrl}
+                alt={candidate.title}
                 width={40}
                 height={40}
                 className="w-10 h-10 rounded-full object-cover"
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-[#E8E6DE] flex items-center justify-center text-sm font-semibold text-gray-600">
-                {candidate.person.initials ?? "?"}
+                {candidate.initials ?? "?"}
               </div>
             )}
             <div>
-              <div className="font-medium text-sm">{candidate.person.title}</div>
+              <div className="font-medium text-sm">{candidate.title}</div>
               <div className="text-xs text-gray-400">{positionName}</div>
             </div>
           </div>
 
           <p className="text-sm text-gray-600">
-            <strong>{candidate.person.title}</strong> als <strong>{positionName}</strong> anfragen?
+            <strong>{candidate.title}</strong> als <strong>{positionName}</strong> anfragen?
           </p>
 
           <div className="flex gap-2">
@@ -194,7 +295,15 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
       );
     }
 
-    // Picking — person picker
+    if (mode.type === "searching") {
+      return (
+        <PersonSearch
+          onSelect={(c) => setMode({ type: "confirming", candidate: c })}
+          onBack={() => setMode({ type: "picking" })}
+        />
+      );
+    }
+
     if (mode.type === "picking") {
       return (
         <div className="flex flex-col h-full">
@@ -206,11 +315,21 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
               ← Zurück zu {person.title}
             </button>
           )}
-          <PersonPickList
-            eventId={eventId}
-            serviceId={serviceTypeId}
-            onSelect={(candidate) => setMode({ type: "confirming", candidate })}
-          />
+          <div className="flex-1 overflow-hidden">
+            <PersonPickList
+              eventId={eventId}
+              serviceId={serviceTypeId}
+              onSelect={(p) => setMode({ type: "confirming", candidate: fromPossiblePerson(p) })}
+            />
+          </div>
+          <div className="shrink-0 border-t border-[#E8E6DE] px-4 py-3">
+            <button
+              onClick={() => setMode({ type: "searching" })}
+              className="w-full text-sm text-gray-500 hover:text-[#C8102E] transition-colors py-1"
+            >
+              Andere Person suchen →
+            </button>
+          </div>
         </div>
       );
     }
@@ -218,7 +337,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
     // Info — occupied slot detail
     return (
       <div className="p-5 space-y-5">
-        {/* Person header */}
         {person && (
           <div className="flex items-center gap-4">
             {person.imageUrl ? (
@@ -243,7 +361,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
           </div>
         )}
 
-        {/* Status */}
         <div className="text-xs space-y-1">
           <div className="font-semibold text-[#1A1A1A] mb-1">Status</div>
           {isAccepted === true && (
@@ -257,7 +374,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
           )}
         </div>
 
-        {/* Anfrage-Historie */}
         <div className="text-xs space-y-1">
           <div className="font-semibold text-[#1A1A1A] mb-1">Anfrage</div>
           {requestedDate ? (
@@ -273,7 +389,6 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
           )}
         </div>
 
-        {/* Actions */}
         <div className="space-y-2 pt-2 border-t border-[#E8E6DE]">
           <button
             onClick={() => setMode({ type: "picking" })}
@@ -292,9 +407,9 @@ export function PersonDrawer({ service, positionName, eventId, onClose }: Props)
     );
   }
 
-  // ── Title per mode ─────────────────────────────────────────────────────────
   function drawerTitle() {
     if (mode.type === "picking") return `${positionName} zuweisen`;
+    if (mode.type === "searching") return "Person suchen";
     if (mode.type === "confirming") return "Anfrage bestätigen";
     return positionName;
   }
